@@ -9,17 +9,30 @@ ticker = int(1)
 # When ticker is at 261834, the normalisation breaks
 
 def _from_rgb(rgb):
-    #translates an rgb tuple of int to a tkinter friendly colour code
+    #translates an rgb tuple of int to a tkinter friendly color code
     r, g, b = rgb
     return f'#{r:02x}{g:02x}{b:02x}'
 
 def vec_divide(num, den):
-	return num.x/den, num.y/den, num.z/den
+	if den != 0:
+		return vec3d(num.x/den, num.y/den, num.z/den)
+	return num
 
+def vec_subtract(vec1, vec2):
+	return vec3d(vec1.x-vec2.x, vec1.y-vec2.y, vec1.z-vec2.z)
+
+def mat_multiply(input1, input2):
+	return (numpy.matmul(input1,input2))
+
+def vec_normalise(vec):
+		return math.sqrt(
+			vec.x*vec.x+
+			vec.y*vec.y+
+			vec.z*vec.z)
 
 class vec3d:
-	def __init__(self, x=0, y=0, z=0):
-		self.x, self.y, self.z = x, y, z
+	def __init__(self, x=0, y=0, z=0, w=1):
+		self.x, self.y, self.z, self.w = x, y, z, w
 
 class triangle:
 	def __init__(self, v1, v2, v3):
@@ -53,7 +66,7 @@ class object:
 				next
 			elif line[0] == 'v':
 				self.verts.append(vec3d(float(line[1]), float(line[2]), float(line[3])))
-			elif line[0] == 'f':				
+			elif line[0] == 'f':
 					self.triList.append(triangle(
 						vec3d(self.verts[int(line[1])-1].x, self.verts[int(line[1])-1].y, self.verts[int(line[1])-1].z),
 						vec3d(self.verts[int(line[2])-1].x, self.verts[int(line[2])-1].y, self.verts[int(line[2])-1].z),
@@ -64,10 +77,6 @@ class object:
 class Window(Tk):
 	def __init__(self):
 		Tk.__init__(self)
-
-		# self.meshCubeObj = object(meshCube, 'test', 0)
-		self.ship = object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship')
-
 		self.screen_width = self.winfo_screenwidth()
 		self.screen_height = self.winfo_screenheight()
 		self.title("Tkinter window")
@@ -75,36 +84,38 @@ class Window(Tk):
 		self.canvas = Canvas(self, width=self.screen_width, height=self.screen_height)
 		self.canvas.create_rectangle(0, 0, self.screen_width, self.screen_height, fill='gray', outline='gray')
 		self.wait_visibility()
+
 		self.timed_refresh()
+
 
 	def depth_buffer_sort(self, points):
 		self.sortedPoints = []
 		for i in range(0,len(points),2):
-			z1 = points[i-1][0][0].z+points[i-1][0][1].z+points[i-1][0][2].z/3
-			z2 = points[i][0][0].z+points[i][0][1].z+points[i][0][2].z/3
+			z1 = (points[i-1][0][0].z+points[i-1][0][1].z+points[i-1][0][2].z)/3
+			z2 = (points[i][0][0].z+points[i][0][1].z+points[i][0][2].z)/3
 			if z1>z2:
 				self.sortedPoints.append([points[i-1][0], points[i-1][1]])
 				self.sortedPoints.append([points[i][0], points[i][1]])
-			else:
-				self.sortedPoints.append([points[i][0], points[i][1]])
-				self.sortedPoints.append([points[i-1][0], points[i-1][1]])
+				next
+			self.sortedPoints.append([points[i][0], points[i][1]])
+			self.sortedPoints.append([points[i-1][0], points[i-1][1]])
 		return self.sortedPoints
 
 	def draw(self, points, tag, shade):
-		# print(f'Passed args: {kwargs}')
+		# print(f'Passed args: {points}, {tag}, {shade})')
 		col = _from_rgb((
-			int(100**(shade)),
-			int(100**(shade)),
-			int(100**(shade))))
+			int(100**shade),
+			int(100**shade),
+			int(100**shade)))
 
-		for i in [points]:
+		for point in [points]:
 			xScale, yScale = 0.25, 0.5
 			xTransform, yTransform = self.screen_width/3, self.screen_height/3
 			coords = []
-			for e in i:
-				coords.append(e.x*xScale*self.screen_width+xTransform)
-				coords.append(e.y*yScale*self.screen_height+yTransform)
-			self.canvas.create_polygon(coords, fill=col, outline='',tag=tag)
+			for xyz in point:
+				coords.append(xyz.x*xScale*self.screen_width+xTransform)
+				coords.append(xyz.y*yScale*self.screen_height+yTransform)
+			self.canvas.create_polygon(coords, fill=col, outline='black',tag=tag)
 		self.canvas.pack()
 	
 	def refresh(self):
@@ -113,98 +124,102 @@ class Window(Tk):
 		self.mousex = self.winfo_pointerx()
 		self.mousey = self.winfo_pointery()
 
-		###
-		###   Hard coded objects
-		###
-
-		# for tri in self.meshCubeObj.triList:
-		self.triListTransformed = []
-		for tri in self.ship.triList:
-			self.triTransformed = []
-			for corner in tri.p:
-				self.triTransformed.append(projection_matrix(corner))
-			cp = cross_product(self.triTransformed)
-			if cp[0]:
-				self.triListTransformed.append([self.triTransformed, cp[1]])
-		# print(self.triListTransformed)
-		self.triSorted = self.depth_buffer_sort(self.triListTransformed)
-		for i in self.triSorted:
-				self.draw(i[0], 'meshCube', i[1])
+		for i in objectsGlobal:
+			triListTransformed = []
+			for a in objectsGlobal[i].triList:
+				triTransformed = []
+				for corner in a.p:
+					triTransformed.append(projection_matrix(corner))
+				cp = cross_product(triTransformed)
+				if cp[0]:
+					triListTransformed.append([triTransformed, cp[1]])
+			self.triSorted = self.depth_buffer_sort(triListTransformed)
+			for a in self.triSorted:
+					self.draw(a[0], i, a[1])
 
 	def timed_refresh(self):
 		init_camera()
 		global ticker
-		self.canvas.delete('meshCube')
+		for i in objectsGlobal:	
+			self.canvas.delete(i)
 		ticker += 1
 		ticker_list.append(ticker)
 		self.refresh()
 		self.after(1, self.timed_refresh)
 
 
-
 def light():
 	light_direcion = vec3d(0,0,-1)
-	l = math.sqrt(light_direcion.x*light_direcion.x+light_direcion.y*light_direcion.y+light_direcion.z*light_direcion.z)
-	light_direcion.x /= l
-	light_direcion.y /= l
-	light_direcion.z /= l
-	return light_direcion
+	return vec_divide(light_direcion, vec_normalise(light_direcion))
 
-def projection_matrix(points):
-	screenwidth = 16
-	screenheight = 9
-	zfar = 1000.0
-	znear = 0.1
-	fov = 90.0
+#Object update
+def projection_matrix(points,
+		screenwidth = 16,
+		screenheight = 9,
+		zfar = 1000.0,
+		znear = 0.1,
+		fov = 90.0,):
 	znorm = zfar/(zfar-znear)
 	aspectRatio = screenwidth/screenheight
 	fovRad = 1/(math.tan((fov*0.5*math.pi)/(180.0)))
 
-		## Transformations here
-	points = rotateX_matrix(points)
-	# points = rotateY_matrix(points)
-	points = rotateZ_matrix(points)
+	## Transformations here
+	angle = ticker/100
+	temp = np.matrix([points.x, points.y, points.z])
 
-	trianglePoints = np.matrix([points.x,points.y,points.z+15,1])
+	matRotX = np.matrix([
+		[1,0,0],
+		[0,math.cos(angle),-(math.sin(angle))],
+		[0,math.sin(angle),math.cos(angle)],
+		])
+
+	matRotY = np.matrix([
+		[math.cos(angle),0,math.sin(angle)],
+		[0,1,0],
+		[-(math.sin(angle)),0,math.cos(angle)],
+		])
+
+	matRotZ = np.matrix([
+		[math.cos(angle),-(math.sin(angle)),0],
+		[math.sin(angle),math.cos(angle),0],
+		[0,0,1],
+		])
+
 	matProj = np.matrix([
-				[aspectRatio*fovRad,0,0,0],
-				[0,fovRad,0,0],
-				[0,0,znorm,1],
-				[0,0,-(zfar-znear)/(zfar-znear),0]
-			])
-	projPointsRaw = (numpy.matmul(trianglePoints,matProj)).tolist()[0]
-	if projPointsRaw[3] != 0:
-		projPoints = vec3d(projPointsRaw[0]/projPointsRaw[3], projPointsRaw[1]/projPointsRaw[3], projPointsRaw[2]/projPointsRaw[3])
-	else:
-		projPoints = vec3d(projPointsRaw[0], projPointsRaw[1], projPointsRaw[2])
+		[aspectRatio*fovRad,0,0,0],
+		[0,fovRad,0,0],
+		[0,0,znorm,1],
+		[0,0,-(zfar-znear)/(zfar-znear),0]
+		])
+
+	temp = mat_multiply(temp, matRotX)
+	temp = mat_multiply(temp, matRotY)
+	temp = mat_multiply(temp, matRotZ)
+	
+	temp = np.append(np.array(temp), points.w)
+	temp[2] = temp[2] + 15
+	temp = mat_multiply(temp, matProj).tolist()[0]
+	projPoints = vec3d(temp[0], temp[1], temp[2])
+
+	if temp[3] != 0:
+		projPoints = vec_divide(projPoints, temp[3])
 	return projPoints
 
 
-## subtracy
 def cross_product(tri):
 	light_direcion = light()
-	line1 = vec3d(
-		tri[1].x-tri[0].x, 
-		tri[1].y-tri[0].y, 
-		tri[1].z-tri[0].z)
-	line2 = vec3d(
-		tri[2].x-tri[0].x, 
-		tri[2].y-tri[0].y, 
-		tri[2].z-tri[0].z)
-	normal = vec3d(
+	line1 = vec_subtract(tri[1], tri[0])
+	line2 = vec_subtract(tri[2], tri[0])
+	norm = vec3d(
 		line1.y * line2.z - line1.z * line2.y,
 		line1.z * line2.x - line1.x * line2.z,
 		line1.x * line2.y - line1.y * line2.x)
 	# anormal = np.cross([line2.x, line1.y, line2.z],[[line2.x, line2.y, line2.z]]).tolist()
 	# normal = vec3d(anormal[0], anormal[1], anormal[2])
 
-## Normalise function?
-	l = math.sqrt(normal.x*normal.x+normal.y*normal.y+normal.z*normal.z)
-	normal.x /= l
-	normal.y /= l
-	normal.z /= l
+	normal = vec_divide(norm, vec_normalise(norm))
 
-	#inefficient
+	#inefficient multi
 	dp = normal.x * light_direcion.x + normal.y * light_direcion.y + normal.z * light_direcion.z
 
 	if (normal.x * (tri[0].x - vcamera.x) +
@@ -235,40 +250,6 @@ def camera_matrix(points):
 	lookAtMatrix = np.linalg.inv(pointAtMatrix)
 	return (numpy.matmul(np.matrix(points),matRotY)).tolist()[0]
 
-
-def rotateX_matrix(points):
-	angle = ticker/100
-	matRotX = np.matrix([
-		[1,0,0],
-		[0,math.cos(angle),-(math.sin(angle))],
-		[0,math.sin(angle),math.cos(angle)],
-		])
-	lst = np.matrix([points.x, points.y, points.z])
-	x = (numpy.matmul(lst,matRotX)).tolist()[0]
-	return vec3d(x[0], x[1], x[2])
-
-def rotateY_matrix(points):
-	angle = ticker/100
-	matRotY = np.matrix([
-		[math.cos(angle),0,math.sin(angle)],
-		[0,1,0],
-		[-(math.sin(angle)),0,math.cos(angle)],
-		])
-	lst = np.matrix([points.x, points.y, points.z])
-	y = (numpy.matmul(lst,matRotY)).tolist()[0]
-	return vec3d(y[0], y[1], y[2])
-
-def rotateZ_matrix(points):
-	angle = ticker/100
-	matRotZ = np.matrix([
-		[math.cos(angle),-(math.sin(angle)),0],
-		[math.sin(angle),math.cos(angle),0],
-		[0,0,1],
-		])
-	lst = np.matrix([points.x, points.y, points.z])
-	z = (numpy.matmul(lst,matRotZ)).tolist()[0]
-	return vec3d(z[0], z[1], z[2])
-
 # def perlin_array(shape = (80, 80),
 # 			scale=100, octaves = 12,
 # 			persistence = 0.025, 
@@ -292,10 +273,14 @@ def rotateZ_matrix(points):
 #     return arr
 
 def main():
+	global objectsGlobal
+	objectsGlobal = {
+		'ship': object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship'),
+		}
+
 	app = Window()
 	app.mainloop()
 
-tripoints = [[50, 50, -500, 0],[100, 50, 0, 0],[100, 100, 0, 0]]#,[450, 500, 0]
 
 meshCube = [
 	[[ 0.0, 0.0, 0.0,], [0.0, 1.0, 0.0,], [1.0, 1.0, 0.0 ]],
@@ -324,7 +309,7 @@ if __name__ == '__main__':
 	end = datetime.datetime.now()
 	secselapsed = end-start
 	fps = len(ticker_list)/secselapsed.total_seconds()
-	print(fps)
+	print(f'fps: {int(fps)}')
 
 	## funct to load objects
 
