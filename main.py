@@ -4,12 +4,13 @@ import math
 import numpy as np
 import datetime
 # from noise import pnoise2
+# from pynput.keyboard import Key, Listener
+
 
 ticker = int(1)
 # When ticker is at 261834, the normalisation breaks
 
 def _from_rgb(rgb):
-    #translates an rgb tuple of int to a tkinter friendly color code
     r, g, b = rgb
     return f'#{r:02x}{g:02x}{b:02x}'
 
@@ -18,17 +19,47 @@ def vec_divide(num, den):
 		return vec3d(num.x/den, num.y/den, num.z/den)
 	return num
 
+def vec_multiply(num, k):
+	return vec3d(num.x/k, num.y/k, num.z/k)
+
 def vec_subtract(vec1, vec2):
 	return vec3d(vec1.x-vec2.x, vec1.y-vec2.y, vec1.z-vec2.z)
+
+def vec_add(vec1, vec2):
+	return vec3d(vec1.x+vec2.x, vec1.y+vec2.y, vec1.z+vec2.z)
 
 def mat_multiply(input1, input2):
 	return (numpy.matmul(input1,input2))
 
-def vec_normalise(vec):
+def vec_dot_product(input1, input2):
+	return input1.x * input2.x + input1.y * input2.y + input1.z * input2.z
+
+def vec_length(input1):
+	return sqrtf(vec_dot_product(v, v))
+
+def vec_normalise(input1):
+	l = vec_length(input1)
+	return vec_divide(input1, l)
+
+def vec_to_np(vec):
+	return np.array([vec.x, vec.y, vec.z, ])
+
+def np_to_vec(np):
+	np=np.tolist()[0]
+	return vec3d(np[0], np[1], np[2])
+
+def vec_normal(vec):
 		return math.sqrt(
 			vec.x*vec.x+
 			vec.y*vec.y+
 			vec.z*vec.z)
+
+def vec_cross_product(v1, v2):
+		v = vec3d(v1.y * v2.z - v1.z * v2.y,
+			v1.z * v2.x - v1.x * v2.z,
+			v1.x * v2.y - v1.y * v2.x)
+		return v
+
 
 class vec3d:
 	def __init__(self, x=0, y=0, z=0, w=1):
@@ -81,9 +112,19 @@ class Window(Tk):
 		self.screen_height = self.winfo_screenheight()
 		self.title("Tkinter window")
 		self.geometry("%dx%d" % (self.screen_width, self.screen_height))
+		self.attributes('-topmost', True)
+		self.wm_attributes("-transparentcolor", "gray")
 		self.canvas = Canvas(self, width=self.screen_width, height=self.screen_height)
 		self.canvas.create_rectangle(0, 0, self.screen_width, self.screen_height, fill='gray', outline='gray')
 		self.wait_visibility()
+		global vCamera
+		vCamera = vec3d(0,0,0)
+		global fYaw
+		fYaw = 0
+		global fPitch
+		fPitch = 0
+		global fRoll
+		fRoll = 0
 
 		self.timed_refresh()
 
@@ -124,6 +165,9 @@ class Window(Tk):
 		self.mousex = self.winfo_pointerx()
 		self.mousey = self.winfo_pointery()
 
+		self.bind('<Key>', self.input)
+
+
 		for i in objectsGlobal:
 			triListTransformed = []
 			for a in objectsGlobal[i].triList:
@@ -138,7 +182,7 @@ class Window(Tk):
 					self.draw(a[0], i, a[1])
 
 	def timed_refresh(self):
-		init_camera()
+		# init_camera()
 		global ticker
 		for i in objectsGlobal:	
 			self.canvas.delete(i)
@@ -147,10 +191,50 @@ class Window(Tk):
 		self.refresh()
 		self.after(1, self.timed_refresh)
 
+	def input(self, event):
+		global vCamera
+		global vLookDir
+		global fYaw
+		global fPitch
+		global fRoll
+		vForward = vec_multiply(vLookDir, 8)
+
+		if event.char == 'w':
+			vCamera.y += 0.1
+		if event.char == 's':
+			vCamera.y -= 0.1
+
+		if event.char == 'a':
+			vCamera.x += 0.1
+		if event.char == 'd':
+			vCamera.x -= 0.1
+
+		# elif event.char == 'j':
+		# 	vCamera.z += 0.1
+		# elif event.char == 'k':
+		# 	vCamera.z -= 0.1
+
+		if event.char == 'i':
+			vCamera = vec_add(vCamera, vForward)
+		if event.char == 'k':
+			vCamera = vec_subtract(vCamera, vForward)
+
+		# if event.char == 'i':
+		# 	fPitch += 0.1
+		# if event.char == 'k':
+		# 	fPitch -= 0.1
+
+		if event.char == 'j':
+			fYaw -= 0.1
+		if event.char == 'l':
+			fYaw += 0.1
+		# print(f'{event.char}')
+
 
 def light():
-	light_direcion = vec3d(0,0,-1)
-	return vec_divide(light_direcion, vec_normalise(light_direcion))
+	light_direcion = vec3d(0,0,-10)
+	## Normalise
+	return vec_divide(light_direcion, vec_normal(light_direcion))
 
 #Object update
 def projection_matrix(points,
@@ -162,28 +246,8 @@ def projection_matrix(points,
 	znorm = zfar/(zfar-znear)
 	aspectRatio = screenwidth/screenheight
 	fovRad = 1/(math.tan((fov*0.5*math.pi)/(180.0)))
-
-	## Transformations here
 	angle = ticker/100
 	temp = np.matrix([points.x, points.y, points.z])
-
-	matRotX = np.matrix([
-		[1,0,0],
-		[0,math.cos(angle),-(math.sin(angle))],
-		[0,math.sin(angle),math.cos(angle)],
-		])
-
-	matRotY = np.matrix([
-		[math.cos(angle),0,math.sin(angle)],
-		[0,1,0],
-		[-(math.sin(angle)),0,math.cos(angle)],
-		])
-
-	matRotZ = np.matrix([
-		[math.cos(angle),-(math.sin(angle)),0],
-		[math.sin(angle),math.cos(angle),0],
-		[0,0,1],
-		])
 
 	matProj = np.matrix([
 		[aspectRatio*fovRad,0,0,0],
@@ -191,40 +255,67 @@ def projection_matrix(points,
 		[0,0,znorm,1],
 		[0,0,-(zfar-znear)/(zfar-znear),0]
 		])
+	
 
-	temp = mat_multiply(temp, matRotX)
-	temp = mat_multiply(temp, matRotY)
-	temp = mat_multiply(temp, matRotZ)
+	# temp = mat_multiply(temp, matRotX(fPitch))
+	# temp = mat_multiply(temp, matRotY(fYaw))
+	# temp = mat_multiply(temp, matRotZ(fRoll))
 	
 	temp = np.append(np.array(temp), points.w)
-	temp[2] = temp[2] + 15
-	temp = mat_multiply(temp, matProj).tolist()[0]
+	temp[2] = temp[2] +15
+	temp = mat_multiply(temp, matProj)
+	temp = mat_multiply(temp, init_camera())
+
+	temp = temp.tolist()[0]
 	projPoints = vec3d(temp[0], temp[1], temp[2])
+	# projPoints = np_to_vec(temp)
 
 	if temp[3] != 0:
 		projPoints = vec_divide(projPoints, temp[3])
 	return projPoints
+
+def matRotX(angle):
+	matRotX = np.matrix([
+		[1,0,0],
+		[0,math.cos(angle),-(math.sin(angle))],
+		[0,math.sin(angle),math.cos(angle)],
+		])
+	return matRotX
+
+def matRotY(angle):
+	matRotY = np.matrix([
+		[math.cos(angle),0,math.sin(angle)],
+		[0,1,0],
+		[-(math.sin(angle)),0,math.cos(angle)],
+		])
+	return matRotY
+
+def matRotZ(angle):
+	matRotZ = np.matrix([
+		[math.cos(angle),-(math.sin(angle)),0],
+		[math.sin(angle),math.cos(angle),0],
+		[0,0,1],
+		])
+	return matRotZ
+
 
 
 def cross_product(tri):
 	light_direcion = light()
 	line1 = vec_subtract(tri[1], tri[0])
 	line2 = vec_subtract(tri[2], tri[0])
-	norm = vec3d(
-		line1.y * line2.z - line1.z * line2.y,
-		line1.z * line2.x - line1.x * line2.z,
-		line1.x * line2.y - line1.y * line2.x)
+	norm = vec_cross_product(line1, line2)
 	# anormal = np.cross([line2.x, line1.y, line2.z],[[line2.x, line2.y, line2.z]]).tolist()
 	# normal = vec3d(anormal[0], anormal[1], anormal[2])
 
-	normal = vec_divide(norm, vec_normalise(norm))
+	## Normalise
+	normal = vec_divide(norm, vec_normal(norm))
 
-	#inefficient multi
-	dp = normal.x * light_direcion.x + normal.y * light_direcion.y + normal.z * light_direcion.z
+	dp = vec_dot_product(normal, light_direcion)
 
-	if (normal.x * (tri[0].x - vcamera.x) +
-		normal.y * (tri[0].y - vcamera.y) +
-		normal.z * (tri[0].z - vcamera.z) < 0.0):
+	if (normal.x * (tri[0].x - vCamera.x) +
+		normal.y * (tri[0].y - vCamera.y) +
+		normal.z * (tri[0].z - vCamera.z) < 0.0):
 		return [True, dp]
 	else:
 		return [False, 0]
@@ -233,22 +324,37 @@ def cross_product(tri):
 
 
 def init_camera():
-	global vcamera
-	vcamera = vec3d(0,0,0)
-	# vLookDir = [0,0,1]
-	# vUp = [0,1,0]
-	# vTarget = np.add(vTarget, vUp)
+	global vCamera
+	global vLookDir
+	vUp = vec3d(0,1,0)
+	# vLookDir = vec3d(0,0,1)
+	vTarget = vec3d(0,0,1)
+	matCameraRot = matRotY(fYaw)
+	vLookDir = mat_multiply(matCameraRot, vec_to_np(vTarget))
+	vLookDir = np_to_vec(vLookDir)
+	vTarget = vec_add(vCamera, vLookDir)
+	matCamera = mat_point_at(vCamera, vTarget, vUp)
+	matView = np.linalg.inv(matCamera)
+	return matView
 
-def camera_matrix(points):
-	pPoints = np.matrix([point[0],point[1],point[2],1])
-	pointAtMatrix = np.matrix([
-				[Ax,Ay,Az,0],
-				[Bx,By,Bz,0],
-				[Cx,Cy,Cz,0],
-				[Tx,Ty,Tz,1],
+def mat_point_at(pos, target, up):
+	newForward = vec_subtract(target, up)
+	## Normalise
+	newForward = vec_divide(newForward, vec_normal(newForward))
+
+	a = vec_multiply(newForward, vec_dot_product(up, newForward))
+	newUp = vec_subtract(up, a)
+	## Normalise
+	newUp = vec_divide(newUp, vec_normal(newUp))
+
+	newRight = vec_cross_product(newUp, newForward)
+	Matrix = np.matrix([
+				[newRight.x,newRight.y,newRight.z,0],
+				[newUp.x,newUp.y,newUp.z,0],
+				[newForward.x,newForward.y,newForward.z,0],
+				[pos.x,pos.y,pos.z,1],
 				])
-	lookAtMatrix = np.linalg.inv(pointAtMatrix)
-	return (numpy.matmul(np.matrix(points),matRotY)).tolist()[0]
+	return Matrix
 
 # def perlin_array(shape = (80, 80),
 # 			scale=100, octaves = 12,
@@ -275,7 +381,8 @@ def camera_matrix(points):
 def main():
 	global objectsGlobal
 	objectsGlobal = {
-		'ship': object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship'),
+		# 'ship': object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship'),
+		'axis': object('D:\\Users\\Koope\\Desktop\\axis.obj', 'axis'),
 		}
 
 	app = Window()
@@ -310,22 +417,3 @@ if __name__ == '__main__':
 	secselapsed = end-start
 	fps = len(ticker_list)/secselapsed.total_seconds()
 	print(f'fps: {int(fps)}')
-
-	## funct to load objects
-
-# from pynput.keyboard import Key, Listener
-
-# def on_press1(key):  
-#     print('{0} pressed'.format(key))
-
-# def on_release1(key):
-#     print('{0} release'.format(key))
-#     if key == Key.esc:
-#         # Stop listener
-#         return False
-
-# # Collect events until released
-# with Listener(
-#         on_press=on_press1,
-#         on_release=on_release1) as listener:
-#     listener.join()
