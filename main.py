@@ -20,7 +20,7 @@ def vec_divide(num, den):
 	return num
 
 def vec_multiply(num, k):
-	return vec3d(num.x/k, num.y/k, num.z/k)
+	return vec3d(num.x*k, num.y*k, num.z*k)
 
 def vec_subtract(vec1, vec2):
 	return vec3d(vec1.x-vec2.x, vec1.y-vec2.y, vec1.z-vec2.z)
@@ -29,7 +29,16 @@ def vec_add(vec1, vec2):
 	return vec3d(vec1.x+vec2.x, vec1.y+vec2.y, vec1.z+vec2.z)
 
 def mat_multiply(input1, input2):
-	return (numpy.matmul(input1,input2))
+	return np.matmul(input1,input2)
+
+def mat_make_trans(x,y,z):
+	sss = np.matrix([
+		[1,0,0,0],
+		[0,1,0,0],
+		[0,0,1,0],
+		[x,y,z,1],
+		])
+	return sss
 
 def vec_dot_product(input1, input2):
 	return input1.x * input2.x + input1.y * input2.y + input1.z * input2.z
@@ -125,6 +134,9 @@ class Window(Tk):
 		fPitch = 0
 		global fRoll
 		fRoll = 0
+		global vTarget
+		vTarget = vec3d(0,0,1)
+
 
 		self.timed_refresh()
 
@@ -156,7 +168,7 @@ class Window(Tk):
 			for xyz in point:
 				coords.append(xyz.x*xScale*self.screen_width+xTransform)
 				coords.append(xyz.y*yScale*self.screen_height+yTransform)
-			self.canvas.create_polygon(coords, fill=col, outline='black',tag=tag)
+			self.canvas.create_polygon(coords, fill='blue', outline='black',tag=tag)
 		self.canvas.pack()
 	
 	def refresh(self):
@@ -173,7 +185,7 @@ class Window(Tk):
 			for a in objectsGlobal[i].triList:
 				triTransformed = []
 				for corner in a.p:
-					triTransformed.append(projection_matrix(corner))
+					triTransformed.append(pipeline(corner))
 				cp = cross_product(triTransformed)
 				if cp[0]:
 					triListTransformed.append([triTransformed, cp[1]])
@@ -197,12 +209,12 @@ class Window(Tk):
 		global fYaw
 		global fPitch
 		global fRoll
-		vForward = vec_multiply(vLookDir, 8)
+		vForward = vec_multiply(vLookDir, 1)
 
 		if event.char == 'w':
-			vCamera.y += 0.1
+			vCamera.z += 0.1
 		if event.char == 's':
-			vCamera.y -= 0.1
+			vCamera.z -= 0.1
 
 		if event.char == 'a':
 			vCamera.x += 0.1
@@ -232,39 +244,36 @@ class Window(Tk):
 
 
 def light():
-	light_direcion = vec3d(0,0,-10)
+	light_direcion = vec3d(0,0,-1)
 	## Normalise
 	return vec_divide(light_direcion, vec_normal(light_direcion))
 
-#Object update
-def projection_matrix(points,
-		screenwidth = 16,
-		screenheight = 9,
-		zfar = 1000.0,
-		znear = 0.1,
-		fov = 90.0,):
-	znorm = zfar/(zfar-znear)
-	aspectRatio = screenwidth/screenheight
-	fovRad = 1/(math.tan((fov*0.5*math.pi)/(180.0)))
-	angle = ticker/100
-	temp = np.matrix([points.x, points.y, points.z])
-
-	matProj = np.matrix([
-		[aspectRatio*fovRad,0,0,0],
-		[0,fovRad,0,0],
-		[0,0,znorm,1],
-		[0,0,-(zfar-znear)/(zfar-znear),0]
-		])
-	
+def pipeline(points):
+	temp = vec_to_np(points)
+	# temp = np.matrix([points.x, points.y, points.z])
 
 	# temp = mat_multiply(temp, matRotX(fPitch))
 	# temp = mat_multiply(temp, matRotY(fYaw))
 	# temp = mat_multiply(temp, matRotZ(fRoll))
 	
+	## World transformation
+	
+	# matTrans = mat_make_trans(0,0,5)
+	# # matWorld = np.matrix([
+	# # 	[1,0,0,0],
+	# # 	[0,1,0,0],
+	# # 	[0,0,1,0],
+	# # 	[0,0,0,1],
+	# # 	])
+	# matWorld = mat_multiply(matRotX, matRotZ)
+	
+	## View transformation
+	temp[2] = temp[2] + 30
 	temp = np.append(np.array(temp), points.w)
-	temp[2] = temp[2] +15
-	temp = mat_multiply(temp, matProj)
 	temp = mat_multiply(temp, init_camera())
+
+	## Projection transformation
+	temp = mat_multiply(temp, projection_matrix())
 
 	temp = temp.tolist()[0]
 	projPoints = vec3d(temp[0], temp[1], temp[2])
@@ -273,6 +282,26 @@ def projection_matrix(points,
 	if temp[3] != 0:
 		projPoints = vec_divide(projPoints, temp[3])
 	return projPoints
+
+
+def projection_matrix(
+		screenwidth = 16,
+		screenheight = 9,
+		zfar = 1000.0,
+		znear = 0.1,
+		fov = 60.0,):
+	znorm = zfar/(zfar-znear)
+	aspectRatio = screenwidth/screenheight
+	fovRad = 1/(math.tan((fov*0.5*math.pi)/(180.0)))
+	angle = ticker/100
+
+	matProj = np.matrix([
+		[aspectRatio*fovRad,0,0,0],
+		[0,fovRad,0,0],
+		[0,0,znorm,1],
+		[0,0,-(zfar-znear)/(zfar-znear),0]
+		])
+	return matProj
 
 def matRotX(angle):
 	matRotX = np.matrix([
@@ -326,9 +355,9 @@ def cross_product(tri):
 def init_camera():
 	global vCamera
 	global vLookDir
-	vUp = vec3d(0,1,0)
+	global vTarget
+	vUp = vec3d(0,-1,0)
 	# vLookDir = vec3d(0,0,1)
-	vTarget = vec3d(0,0,1)
 	matCameraRot = matRotY(fYaw)
 	vLookDir = mat_multiply(matCameraRot, vec_to_np(vTarget))
 	vLookDir = np_to_vec(vLookDir)
