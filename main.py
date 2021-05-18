@@ -121,8 +121,6 @@ class Window(Tk):
 		self.screen_height = self.winfo_screenheight()
 		self.title("Tkinter window")
 		self.geometry("%dx%d" % (self.screen_width, self.screen_height))
-		self.attributes('-topmost', True)
-		self.wm_attributes("-transparentcolor", "gray")
 		self.canvas = Canvas(self, width=self.screen_width, height=self.screen_height)
 		self.canvas.create_rectangle(0, 0, self.screen_width, self.screen_height, fill='gray', outline='gray')
 		self.wait_visibility()
@@ -209,7 +207,7 @@ class Window(Tk):
 		global fYaw
 		global fPitch
 		global fRoll
-		vForward = vec_multiply(vLookDir, 1)
+		vForward = vec_multiply(vLookDir, 8)
 
 		if event.char == 'w':
 			vCamera.z += 0.1
@@ -250,26 +248,17 @@ def light():
 
 def pipeline(points):
 	temp = vec_to_np(points)
-	# temp = np.matrix([points.x, points.y, points.z])
-
 	# temp = mat_multiply(temp, matRotX(fPitch))
 	# temp = mat_multiply(temp, matRotY(fYaw))
 	# temp = mat_multiply(temp, matRotZ(fRoll))
+
+	# temp[2] = temp[2] + 30
+	temp = np.append(np.array(temp), points.w)
 	
 	## World transformation
-	
-	# matTrans = mat_make_trans(0,0,5)
-	# # matWorld = np.matrix([
-	# # 	[1,0,0,0],
-	# # 	[0,1,0,0],
-	# # 	[0,0,1,0],
-	# # 	[0,0,0,1],
-	# # 	])
-	# matWorld = mat_multiply(matRotX, matRotZ)
-	
+	temp = mat_multiply(temp, world_matrix())
+
 	## View transformation
-	temp[2] = temp[2] + 30
-	temp = np.append(np.array(temp), points.w)
 	temp = mat_multiply(temp, init_camera())
 
 	## Projection transformation
@@ -278,11 +267,22 @@ def pipeline(points):
 	temp = temp.tolist()[0]
 	projPoints = vec3d(temp[0], temp[1], temp[2])
 	# projPoints = np_to_vec(temp)
-
 	if temp[3] != 0:
 		projPoints = vec_divide(projPoints, temp[3])
 	return projPoints
 
+
+def world_matrix():
+	matTrans = mat_make_trans(0,0,15)
+	matWorld = np.matrix([
+		[1,0,0,0],
+		[0,1,0,0],
+		[0,0,1,0],
+		[0,0,0,1],
+		])
+	# matWorld = mat_multiply(matRotX(ticker), matRotZ(ticker))
+	matWorld = mat_multiply(matWorld, matTrans)
+	return matWorld
 
 def projection_matrix(
 		screenwidth = 16,
@@ -348,8 +348,6 @@ def cross_product(tri):
 		return [True, dp]
 	else:
 		return [False, 0]
-
-# def dotPproduct(normals, translateds, camera):
 
 
 def init_camera():
