@@ -53,6 +53,18 @@ def mat_make_trans(x,y,z):
 		])
 	return sss
 
+def mat_inverse(input1):
+	input1 = input1.tolist()
+	new = np.matrix([
+		[input1[0][0], input1[1][0], input1[2][0], 0, ],
+		[input1[0][1], input1[1][1], input1[2][1], 0, ],
+		[input1[0][2], input1[1][2], input1[2][2], 0, ],
+		[-(input1[3][0] * input1[0][0] + input1[3][1] * input1[0][1] + input1[3][2] * input1[0][2]),
+		 -(input1[3][0] * input1[1][0] + input1[3][1] * input1[1][1] + input1[3][2] * input1[1][2]), 
+		 -(input1[3][0] * input1[2][0] + input1[3][1] * input1[2][1] + input1[3][2] * input1[2][2]), 1, ],
+		])
+	return new
+
 def vec_dot_product(input1, input2):
 	return input1.x * input2.x + input1.y * input2.y + input1.z * input2.z
 
@@ -90,7 +102,11 @@ def vec_cross_product(v1, v2):
 
 
 class vec3d:
-	def __init__(self, x=0, y=0, z=0, w=1):
+	def __init__(self, 
+		x=0, 
+		y=0, 
+		z=0, 
+		w=1):
 		self.x, self.y, self.z, self.w = x, y, z, w
 
 class triangle:
@@ -143,8 +159,9 @@ class Window(Tk):
 		self.canvas = Canvas(self, width=self.screen_width, height=self.screen_height)
 		self.canvas.create_rectangle(0, 0, self.screen_width, self.screen_height, fill='gray', outline='gray')
 		self.wait_visibility()
+
 		global vCamera
-		vCamera = vec3d(0,0,0)
+		vCamera = vec3d(0,0,-10)
 		global fYaw
 		fYaw = 0
 		global fPitch
@@ -155,6 +172,9 @@ class Window(Tk):
 		vTarget = vec3d(0,0,1)
 		global light_direcion
 		light_direcion = vec3d(0,0,-1)
+		global camMove
+		camMove = vec3d()
+
 		self.timed_refresh()
 
 
@@ -205,27 +225,32 @@ class Window(Tk):
 		global fYaw
 		global fPitch
 		global fRoll
-		vForward = vec_multiply(vLookDir, 0.0001)
+		global camMove
+
+		vForward = vec_multiply(vLookDir, 1)
+		camMove = vec3d()
+
+		# if event.char == 'w':
+		# 	vCamera.z += 1
+		# 	print(vCamera.z)
+		# if event.char == 's':
+		# 	vCamera.z -= 1
 
 		if event.char == 'w':
-			vCamera.z += 1
+			vCamera = vec_add(vCamera, vForward)
 		if event.char == 's':
-			vCamera.z -= 1
+			vCamera = vec_subtract(vCamera, vForward)
 
 		if event.char == 'a':
 			vCamera.x += 1
 		if event.char == 'd':
 			vCamera.x -= 1
 
-		elif event.char == 'q':
+		if event.char == 'q':
 			vCamera.y += 0.1
-		elif event.char == 'e':
+		if event.char == 'e':
 			vCamera.y -= 0.1
 
-		# if event.char == 'w':
-		# 	vCamera = vec_add(vCamera, vForward)
-		# if event.char == 's':
-		# 	vCamera = vec_subtract(vCamera, vForward)
 
 		if event.char == 'i':
 			fPitch += 0.01
@@ -233,9 +258,9 @@ class Window(Tk):
 			fPitch -= 0.01
 
 		if event.char == 'j':
-			fYaw += 0.01
-		if event.char == 'l':
 			fYaw -= 0.01
+		if event.char == 'l':
+			fYaw += 0.01
 		# print(f'{event.char}')
 
 	def release(self, event):
@@ -244,6 +269,7 @@ class Window(Tk):
 		global fYaw
 		global fPitch
 		global fRoll
+
 		vForward = vec_multiply(vLookDir, 0.0001)
 
 		if event.char == 'w':
@@ -401,21 +427,32 @@ def init_camera():
 	global vTarget
 	global fYaw
 	global fPitch
-	print(f'vTarget: {vTarget.x},{vTarget.y},{vTarget.z}')
+	global camMove
+	
+	# vCamera = vec_add(vCamera, camMove)
+
+	vTarget = vec3d(0,0,1)
 	vUp = vec3d(0,-1,0)
-	vLookDir = multiply_vecmat(vTarget, matRotY(fYaw))
+	# print(f'vTarget: {vTarget.x},{vTarget.y},{vTarget.z}')
+	
+	matCameraRot = matRotY(fYaw)
 	# vLookDir = multiply_vecmat(vLookDir, matRotX(fPitch))
-	fYaw = 0
-	fPitch = 0
+	vLookDir = multiply_vecmat(vTarget, matCameraRot)
 	vTarget = vec_add(vCamera, vLookDir)
+
+	# print(vLookDir.x, vLookDir.y, vLookDir.z, )
 	matCamera = mat_point_at(vCamera, vTarget, vUp)
-	matView = np.linalg.inv(matCamera) ## Crash here if something.z == 0
-	# print(f'vLookDir: {vLookDir.x},{vLookDir.y},{vLookDir.z}')
+
+	# matView = np.linalg.inv(matCamera) ## Crash here if something.z == 0
+	matView = mat_inverse(matCamera)
+
+	print(f'vLookDir: {vLookDir.x},{vLookDir.y},{vLookDir.z}')
 	# print(f'vUp: {vUp.x},{vUp.y},{vUp.z}, vTarget: {vTarget.x},{vTarget.y},{vTarget.z}')
+
 	return matView
 
 def mat_point_at(pos, target, up):
-	newForward = vec_subtract(target, up)
+	newForward = vec_subtract(target, pos)
 	## Normalise
 	newForward = vec_divide(newForward, vec_normal(newForward))
 
@@ -437,8 +474,8 @@ def mat_point_at(pos, target, up):
 def main():
 	global objectsGlobal
 	objectsGlobal = {
-		# 'ship': object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship'),
-		'axis': object('D:\\Users\\Koope\\Desktop\\axis.obj', 'axis'),
+		'ship': object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship'),
+		# 'axis': object('D:\\Users\\Koope\\Desktop\\axis.obj', 'axis'),
 		}
 
 	App = Window()
