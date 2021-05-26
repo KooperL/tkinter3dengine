@@ -25,8 +25,10 @@ class triangle:
 	def __init__(self,
 		v1: vec3d,
 		v2: vec3d,
-		v3: vec3d):
+		v3: vec3d,
+		dp=None):
 		self.p=[v1, v2, v3]
+		self.dp=dp
 
 class object:
 	def __init__(self, objdir, name, vCoords=(0,0,0) , file=1):
@@ -56,6 +58,8 @@ class object:
 	def type2(self, rawPoints):
 		pass
 
+def getZs(tri):
+	return (tri.p[0].z+tri.p[1].z+tri.p[2].z)/3
 
 def _from_rgb(rgb):
     r, g, b = rgb
@@ -146,6 +150,8 @@ class Window(Tk):
 		self.screen_height = self.winfo_screenheight()
 		self.title("Tkinter window")
 		self.geometry("%dx%d" % (self.screen_width, self.screen_height))
+		self.attributes('-topmost', True)
+		# self.wm_attributes("-transparentcolor", "gray")
 		self.canvas = Canvas(self, width=self.screen_width, height=self.screen_height)
 		self.canvas.create_rectangle(0, 0, self.screen_width, self.screen_height, fill='gray', outline='gray')
 		# self.wait_visibility()
@@ -159,10 +165,8 @@ class Window(Tk):
 		global fRoll
 		fRoll = 0
 		global light_direcion
-		light_direcion = vec3d(0,0,-1)
-
+		light_direcion = vec3d(0,-1,-1)
 		self.timed_refresh()
-
 
 
 	def draw(self, points, tag, shade):
@@ -180,7 +184,7 @@ class Window(Tk):
 			points[1].y*yScale*self.screen_height+yTransform,
 			points[2].x*xScale*self.screen_width+xTransform,
 			points[2].y*yScale*self.screen_height+yTransform,
-			fill='blue', outline='black',tag=tag)
+			fill=col, outline='',tag=tag)
 		self.canvas.pack()
 	
 	def timed_refresh(self):
@@ -266,10 +270,10 @@ class Window(Tk):
 		# if event.char == 's':
 		# 	vCamera.z -= 1
 
-		# if event.char == 'q':
-		# 	vCamera.y += 0.1
-		# if event.char == 'e':
-		# 	vCamera.y -= 0.1
+		if event.char == 'q':
+			vCamera.y += 1
+		if event.char == 'e':
+			vCamera.y -= 1
 
 		# if event.char == 'a':
 		# 	vCamera.x += 1
@@ -297,19 +301,6 @@ class Window(Tk):
 			fYaw += 0.05
 		# print(f'{event.char}')
 
-	def depth_buffer_sort(self, points):
-		self.sortedPoints = []
-		for i in range(0,len(points),2):
-			z1 = (points[i-1][0][0].z+points[i-1][0][1].z+points[i-1][0][2].z)/3
-			z2 = (points[i][0][0].z+points[i][0][1].z+points[i][0][2].z)/3
-			if z1>z2:
-				self.sortedPoints.append([points[i-1][0], points[i-1][1]])
-				self.sortedPoints.append([points[i][0], points[i][1]])
-				next
-			self.sortedPoints.append([points[i][0], points[i][1]])
-			self.sortedPoints.append([points[i-1][0], points[i-1][1]])
-		return self.sortedPoints
-
 	def pipeline(self):
 		#self.canvas.create_line(kwargs[0], kwargs[1], 300, 200, dash=(4, 2))
 		#self.canvas.bind('<Motion>', self.mouse)
@@ -318,7 +309,7 @@ class Window(Tk):
 		self.bind('<KeyPress>', self.press)
 		# self.bind('<KeyRelease>', self.release)
 		for obj in objectsGlobal:
-			triListTransformed = []
+			triToRaster = []
 			for corner in objectsGlobal[obj].triList:
 
 				## World transformation
@@ -361,14 +352,19 @@ class Window(Tk):
 				triProjected = triangle(
 					multiply_vecmat(triViewed.p[0], projection_matrix()),
 					multiply_vecmat(triViewed.p[1], projection_matrix()),
-					multiply_vecmat(triViewed.p[2], projection_matrix()))
+					multiply_vecmat(triViewed.p[2], projection_matrix()),
+					dp)
 
 				triProjected.p[0] = vec_divide(triProjected.p[0], triProjected.p[0].w)
 				triProjected.p[1] = vec_divide(triProjected.p[1], triProjected.p[1].w)
 				triProjected.p[2] = vec_divide(triProjected.p[2], triProjected.p[2].w)
 
-				# self.triSorted = self.depth_buffer_sort(triListTransformed)
-				self.draw(triProjected.p, obj, dp)
+				triToRaster.append(triProjected)
+			# triToRaster = self.depth_buffer_sort(triToRaster)
+			print(triToRaster[0])
+			triToRaster.sort(key=getZs)
+			for tri in triToRaster:
+				self.draw(tri.p, obj, tri.dp)
 
 
 def world_matrix(trans):
@@ -398,7 +394,7 @@ def projection_matrix(
 		[aspectRatio*fovRad,0,0,0],
 		[0,fovRad,0,0],
 		[0,0,znorm,1],
-		[0,0,-(zfar-znear)/(zfar-znear),0]
+		[0,0,(-zfar*znear)/(zfar-znear),0]
 		])
 	return matProj
 
@@ -443,10 +439,10 @@ def init_camera():
 	# print(f'vTarget: {vTarget.x},{vTarget.y},{vTarget.z}')
 	
 	matCameraRotYaw = matRotY(fYaw) # Yaw pivots origin
-	vLookDir = multiply_vecmat(vTarget, matCameraRotYaw)
-
 	matCameraRotPitch = matRotX(fPitch)
-	vLookDir = multiply_vecmat(vLookDir, matCameraRotPitch)
+
+	matCameraRot = mat_multiply(matCameraRotPitch, matCameraRotYaw)
+	vLookDir = multiply_vecmat(vTarget, matCameraRot)
 
 	vTarget = vec_add(vCamera, vLookDir)
 
@@ -487,6 +483,7 @@ def main():
 		'ship': object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship', (0,0,0),),
 		'axis': object('D:\\Users\\Koope\\Desktop\\axis.obj', 'axis', (0,10,5),),
 		'cube': object('D:\\Users\\Koope\\Desktop\\cube.obj', 'cube', (3,5,0),1),
+		# 'teapot2': object('D:\\Users\\Koope\\Desktop\\teapot2.obj', 'teapot2', (0,0,0),1),
 		}
 
 	App = Window()
