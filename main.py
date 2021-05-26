@@ -10,129 +10,35 @@ import datetime
 ticker = int(1)
 # When ticker is at 261834, the normalisation breaks
 
-def _from_rgb(rgb):
-    r, g, b = rgb
-    return f'#{r:02x}{g:02x}{b:02x}'
-
-def vec_divide(num, den):
-	if den != 0:
-		return vec3d(num.x/den, num.y/den, num.z/den)
-	return num
-
-def vec_multiply(num, k):
-	return vec3d(num.x*k, num.y*k, num.z*k)
-
-def multiply_vecmat(vec, mat):
-	# print(mat)
-	if mat.shape[0] == 1:
-		mat=mat.tolist()[0]
-	else:
-		mat=mat.tolist()
-	# print(mat)
-	return vec3d(
-		vec.x*mat[0][0]+vec.y*mat[1][0]+vec.z*mat[2][0]+vec.w*mat[3][0], 
-		vec.x*mat[0][1]+vec.y*mat[1][1]+vec.z*mat[2][1]+vec.w*mat[3][1], 
-		vec.x*mat[0][2]+vec.y*mat[1][2]+vec.z*mat[2][2]+vec.w*mat[3][2],
-		vec.x*mat[0][3]+vec.y*mat[1][3]+vec.z*mat[2][3]+vec.w*mat[3][3])
-
-def vec_subtract(vec1, vec2):
-	return vec3d(vec1.x-vec2.x, vec1.y-vec2.y, vec1.z-vec2.z)
-
-def vec_add(vec1, vec2):
-	return vec3d(vec1.x+vec2.x, vec1.y+vec2.y, vec1.z+vec2.z)
-
-def mat_multiply(input1, input2):
-	return np.matmul(input1,input2)
-
-def mat_make_trans(x,y,z):
-	sss = np.matrix([
-		[1,0,0,0],
-		[0,1,0,0],
-		[0,0,1,0],
-		[x,y,z,1],
-		])
-	return sss
-
-def mat_inverse(input1):
-	input1 = input1.tolist()
-	new = np.matrix([
-		[input1[0][0], input1[1][0], input1[2][0], 0, ],
-		[input1[0][1], input1[1][1], input1[2][1], 0, ],
-		[input1[0][2], input1[1][2], input1[2][2], 0, ],
-		[-(input1[3][0] * input1[0][0] + input1[3][1] * input1[0][1] + input1[3][2] * input1[0][2]),
-		 -(input1[3][0] * input1[1][0] + input1[3][1] * input1[1][1] + input1[3][2] * input1[1][2]), 
-		 -(input1[3][0] * input1[2][0] + input1[3][1] * input1[2][1] + input1[3][2] * input1[2][2]), 1, ],
-		])
-	return new
-
-def vec_dot_product(input1, input2):
-	return input1.x * input2.x + input1.y * input2.y + input1.z * input2.z
-
-def vec_length(input1):
-	return sqrtf(vec_dot_product(v, v))
-
-def vec_normalise(input1):
-	l = vec_length(input1)
-	return vec_divide(input1, l)
-
-def vec_to_np(vec, w=1):
-	# if w == 1:
-	# 	return np.array([vec.x, vec.y, vec.z, vec.w])
-	return np.array([vec.x, vec.y, vec.z, vec.w])
-
-def np_to_vec(np):
-	# print(np.shape)
-	np=np.tolist()
-	# print(np)
-	if np[3]:
-		return vec3d(np[0], np[1], np[2], np[3])
-	return vec3d(np[0], np[1], np[2])
-
-def vec_normal(vec):
-		return math.sqrt(
-			vec.x*vec.x+
-			vec.y*vec.y+
-			vec.z*vec.z)
-
-def vec_cross_product(v1, v2):
-		v = vec3d(v1.y * v2.z - v1.z * v2.y,
-			v1.z * v2.x - v1.x * v2.z,
-			v1.x * v2.y - v1.y * v2.x)
-		return v
-
-
 class vec3d:
 	def __init__(self, 
 		x=0, 
 		y=0, 
 		z=0, 
 		w=1):
-		self.x, self.y, self.z, self.w = x, y, z, w
+		self.x = float(x)
+		self.y = float(y)
+		self.z = float(z)
+		self.w = float(w)
 
 class triangle:
-	def __init__(self, v1, v2, v3):
+	def __init__(self,
+		v1: vec3d,
+		v2: vec3d,
+		v3: vec3d):
 		self.p=[v1, v2, v3]
 
 class object:
-	def __init__(self, objdir, name, file=1):
+	def __init__(self, objdir, name, vCoords=(0,0,0) , file=1):
 		self.name = name
+		self.vCoords = vCoords
 		if file == 1:
 			vlist = open(objdir, 'r').readlines()
-			self.meshObj(vlist)
+			self.type1(vlist)
 		else:
-			self.mesh(self.vlist)
+			self.type2(vlist)
 
-	def mesh(self, rawPoints):
-		self.triList = []
-		for point in rawPoints:
-			a = triangle(
-				vec3d(point[0][0], point[0][1], point[0][2]),
-				vec3d(point[1][0], point[1][1], point[1][2]),
-				vec3d(point[2][0], point[2][1], point[2][2]))
-			self.triList.append(a)
-		return
-
-	def meshObj(self, rawPoints):
+	def type1(self, rawPoints):
 		self.triList = []
 		self.verts = []
 		for line in rawPoints:
@@ -147,6 +53,90 @@ class object:
 						vec3d(self.verts[int(line[2])-1].x, self.verts[int(line[2])-1].y, self.verts[int(line[2])-1].z),
 						vec3d(self.verts[int(line[3])-1].x, self.verts[int(line[3])-1].y, self.verts[int(line[3])-1].z)))
 
+	def type2(self, rawPoints):
+		pass
+
+
+def _from_rgb(rgb):
+    r, g, b = rgb
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+def vec_divide(num: vec3d, den: int) -> vec3d:
+	if den != 0:
+		return vec3d(num.x/den, num.y/den, num.z/den)
+	return num
+
+def vec_multiply(num: vec3d, k: int) -> vec3d:
+	return vec3d(num.x*k, num.y*k, num.z*k)
+
+def multiply_vecmat(vec: vec3d, mat: np.matrix) -> vec3d:
+	if mat.shape[0] == 1:
+		mat=mat.tolist()[0]
+	else:
+		mat=mat.tolist()
+	return vec3d(
+		vec.x*mat[0][0]+vec.y*mat[1][0]+vec.z*mat[2][0]+vec.w*mat[3][0], 
+		vec.x*mat[0][1]+vec.y*mat[1][1]+vec.z*mat[2][1]+vec.w*mat[3][1], 
+		vec.x*mat[0][2]+vec.y*mat[1][2]+vec.z*mat[2][2]+vec.w*mat[3][2],
+		vec.x*mat[0][3]+vec.y*mat[1][3]+vec.z*mat[2][3]+vec.w*mat[3][3])
+
+def vec_subtract(vec1: vec3d, vec2: vec3d) -> vec3d:
+	return vec3d(vec1.x-vec2.x, vec1.y-vec2.y, vec1.z-vec2.z)
+
+def vec_add(vec1: vec3d, vec2: vec3d) -> vec3d:
+	return vec3d(vec1.x+vec2.x, vec1.y+vec2.y, vec1.z+vec2.z)
+
+def mat_multiply(input1, input2):
+	return np.matmul(input1,input2)
+
+def mat_make_trans(x,y,z) -> np.matrix:
+	return np.matrix([
+		[1,0,0,0],
+		[0,1,0,0],
+		[0,0,1,0],
+		[x,y,z,1],
+		])
+
+def mat_inverse(input1):
+	input1 = input1.tolist()
+	return np.matrix([
+		[input1[0][0], input1[1][0], input1[2][0], 0, ],
+		[input1[0][1], input1[1][1], input1[2][1], 0, ],
+		[input1[0][2], input1[1][2], input1[2][2], 0, ],
+		[-(input1[3][0] * input1[0][0] + input1[3][1] * input1[0][1] + input1[3][2] * input1[0][2]),
+		 -(input1[3][0] * input1[1][0] + input1[3][1] * input1[1][1] + input1[3][2] * input1[1][2]), 
+		 -(input1[3][0] * input1[2][0] + input1[3][1] * input1[2][1] + input1[3][2] * input1[2][2]), 1, ],
+		])
+
+def vec_dot_product(input1: vec3d, input2: vec3d):
+	return input1.x * input2.x + input1.y * input2.y + input1.z * input2.z
+
+def vec_length(input1):
+	return sqrtf(vec_dot_product(v, v))
+
+def vec_normalise(input1):
+	l = vec_length(input1)
+	return vec_divide(input1, l)
+
+def vec_to_np(vec, w=1):
+	return np.array([vec.x, vec.y, vec.z, vec.w])
+
+def np_to_vec(np):
+	np=np.tolist()
+	if np[3]:
+		return vec3d(np[0], np[1], np[2], np[3])
+	return vec3d(np[0], np[1], np[2])
+
+def vec_normal(vec: vec3d):
+		return math.sqrt(
+			vec.x*vec.x+
+			vec.y*vec.y+
+			vec.z*vec.z)
+
+def vec_cross_product(v1, v2):
+		return vec3d(v1.y * v2.z - v1.z * v2.y,
+			v1.z * v2.x - v1.x * v2.z,
+			v1.x * v2.y - v1.y * v2.x)
 
 
 class Window(Tk):
@@ -156,9 +146,11 @@ class Window(Tk):
 		self.screen_height = self.winfo_screenheight()
 		self.title("Tkinter window")
 		self.geometry("%dx%d" % (self.screen_width, self.screen_height))
+		self.attributes('-topmost', True)
+		# self.wm_attributes("-transparentcolor", "gray")
 		self.canvas = Canvas(self, width=self.screen_width, height=self.screen_height)
 		self.canvas.create_rectangle(0, 0, self.screen_width, self.screen_height, fill='gray', outline='gray')
-		self.wait_visibility()
+		# self.wait_visibility()
 
 		global vCamera
 		vCamera = vec3d(0,0,-10)
@@ -168,28 +160,12 @@ class Window(Tk):
 		fPitch = 0
 		global fRoll
 		fRoll = 0
-		global vTarget
-		vTarget = vec3d(0,0,1)
 		global light_direcion
 		light_direcion = vec3d(0,0,-1)
-		global camMove
-		camMove = vec3d()
 
 		self.timed_refresh()
 
 
-	def depth_buffer_sort(self, points):
-		self.sortedPoints = []
-		for i in range(0,len(points),2):
-			z1 = (points[i-1][0][0].z+points[i-1][0][1].z+points[i-1][0][2].z)/3
-			z2 = (points[i][0][0].z+points[i][0][1].z+points[i][0][2].z)/3
-			if z1>z2:
-				self.sortedPoints.append([points[i-1][0], points[i-1][1]])
-				self.sortedPoints.append([points[i][0], points[i][1]])
-				next
-			self.sortedPoints.append([points[i][0], points[i][1]])
-			self.sortedPoints.append([points[i-1][0], points[i-1][1]])
-		return self.sortedPoints
 
 	def draw(self, points, tag, shade):
 		# print(f'Passed args: {points}, {tag}, {shade})')
@@ -206,7 +182,7 @@ class Window(Tk):
 			points[1].y*yScale*self.screen_height+yTransform,
 			points[2].x*xScale*self.screen_width+xTransform,
 			points[2].y*yScale*self.screen_height+yTransform,
-			fill=col, outline='black',tag=tag)
+			fill='blue', outline='black',tag=tag)
 		self.canvas.pack()
 	
 	def timed_refresh(self):
@@ -216,8 +192,61 @@ class Window(Tk):
 		ticker += 1
 		self.pipeline()
 		# print(f'fYaw: {fYaw}, fPitch: {fPitch}')
-		# print(f'x: {vCamera.x}, y {vCamera.y}, z: {vCamera.z}')
+		print(f'x: {vCamera.x}, y {vCamera.y}, z: {vCamera.z}')
 		self.after(1, self.timed_refresh)
+
+	def controls(self,
+		forward='w',
+		back='a',
+		left='s',
+		right='d',
+		lookUp='i',
+		lookDown='k',
+		lookLeft='j',
+		lookRight='l',):
+		global vLookDir
+		global fRoll
+		def forward():
+			global vCamera
+			vForward = vec_multiply(vLookDir, 1)
+			vCamera = vec_add(vCamera, vForward)
+		def back():
+			global vCamera
+			vForward = vec_multiply(vLookDir, 1)
+			vCamera = vec_subtract(vCamera, vForward)
+		def left():
+			global vCamera
+			vForward = vec_multiply(vLookDir, 1)
+			vRight = vec_cross_product(vUp, vForward)
+			vCamera = vec_subtract(vCamera, vRight)
+		def right():
+			global vCamera
+			vForward = vec_multiply(vLookDir, 1)
+			vRight = vec_cross_product(vUp, vForward)
+			vCamera = vec_add(vCamera, vRight)
+		def lookUp():
+			global fPitch
+			fPitch -= 0.01
+		def lookDown():
+			global fPitch
+			fPitch += 0.01
+		def lookLeft():
+			global fYaw
+			fYaw -= 0.01
+		def lookRight():
+			global fYaw
+			fYaw += 0.01
+		action = {
+		'forward' : forward(),
+		'back' : back(),
+		'left' : left(),
+		'right' : right(),
+		'lookUp' : lookUp(),
+		'lookDown' : lookDown(),
+		'lookLeft' : lookLeft(),
+		'lookRight' : lookRight(),
+		}
+		return action
 
 	def press(self, event):
 		global vCamera
@@ -225,10 +254,13 @@ class Window(Tk):
 		global fYaw
 		global fPitch
 		global fRoll
-		global camMove
+		global vUp
 
-		vForward = vec_multiply(vLookDir, 1)
-		camMove = vec3d()
+		vForward = vec_multiply(vLookDir, 3)
+		vRight = vec_cross_product(vUp, vForward)
+
+		# print(f'vLookDir: {vLookDir.x}, y {vLookDir.y}, z: {vLookDir.z}, vForward: {vForward.x}, y {vForward.y}, z: {vForward.z}')
+
 
 		# if event.char == 'w':
 		# 	vCamera.z += 1
@@ -236,72 +268,49 @@ class Window(Tk):
 		# if event.char == 's':
 		# 	vCamera.z -= 1
 
+		# if event.char == 'q':
+		# 	vCamera.y += 0.1
+		# if event.char == 'e':
+		# 	vCamera.y -= 0.1
+
+		# if event.char == 'a':
+		# 	vCamera.x += 1
+		# if event.char == 'd':
+		# 	vCamera.x -= 1
+
 		if event.char == 'w':
 			vCamera = vec_add(vCamera, vForward)
 		if event.char == 's':
 			vCamera = vec_subtract(vCamera, vForward)
 
 		if event.char == 'a':
-			vCamera.x += 1
+			vCamera = vec_subtract(vCamera, vRight)
 		if event.char == 'd':
-			vCamera.x -= 1
-
-		if event.char == 'q':
-			vCamera.y += 0.1
-		if event.char == 'e':
-			vCamera.y -= 0.1
-
+			vCamera = vec_add(vCamera, vRight)
 
 		if event.char == 'i':
-			fPitch += 0.01
+			fPitch += 0.05
 		if event.char == 'k':
-			fPitch -= 0.01
+			fPitch -= 0.05
 
 		if event.char == 'j':
-			fYaw -= 0.01
+			fYaw -= 0.05
 		if event.char == 'l':
-			fYaw += 0.01
+			fYaw += 0.05
 		# print(f'{event.char}')
 
-	def release(self, event):
-		global vCamera
-		global vLookDir
-		global fYaw
-		global fPitch
-		global fRoll
-
-		vForward = vec_multiply(vLookDir, 0.0001)
-
-		if event.char == 'w':
-			vCamera.z -= 1
-		if event.char == 's':
-			vCamera.z += 1
-
-		if event.char == 'a':
-			vCamera.x -= 1
-		if event.char == 'd':
-			vCamera.x += 1
-
-		elif event.char == 'q':
-			vCamera.y -= 0.1
-		elif event.char == 'e':
-			vCamera.y += 0.1
-
-		# if event.char == 'w':
-		# 	vCamera = vec_add(vCamera, vForward)
-		# if event.char == 's':
-		# 	vCamera = vec_subtract(vCamera, vForward)
-
-		if event.char == 'i':
-			fPitch -= 0.01
-		if event.char == 'k':
-			fPitch += 0.01
-
-		if event.char == 'j':
-			fYaw -= 0.01
-		if event.char == 'l':
-			fYaw += 0.01
-		# print(f'{event.char}')
+	def depth_buffer_sort(self, points):
+		self.sortedPoints = []
+		for i in range(0,len(points),2):
+			z1 = (points[i-1][0][0].z+points[i-1][0][1].z+points[i-1][0][2].z)/3
+			z2 = (points[i][0][0].z+points[i][0][1].z+points[i][0][2].z)/3
+			if z1>z2:
+				self.sortedPoints.append([points[i-1][0], points[i-1][1]])
+				self.sortedPoints.append([points[i][0], points[i][1]])
+				next
+			self.sortedPoints.append([points[i][0], points[i][1]])
+			self.sortedPoints.append([points[i-1][0], points[i-1][1]])
+		return self.sortedPoints
 
 	def pipeline(self):
 		#self.canvas.create_line(kwargs[0], kwargs[1], 300, 200, dash=(4, 2))
@@ -316,9 +325,9 @@ class Window(Tk):
 
 				## World transformation
 				triTransformed = triangle(
-					multiply_vecmat(corner.p[0], world_matrix()),
-					multiply_vecmat(corner.p[1], world_matrix()),
-					multiply_vecmat(corner.p[2], world_matrix()))
+					multiply_vecmat(corner.p[0], world_matrix(objectsGlobal[obj].vCoords)),
+					multiply_vecmat(corner.p[1], world_matrix(objectsGlobal[obj].vCoords)),
+					multiply_vecmat(corner.p[2], world_matrix(objectsGlobal[obj].vCoords)))
 
 				line1 = vec_subtract(triTransformed.p[1], triTransformed.p[0])
 				line2 = vec_subtract(triTransformed.p[2], triTransformed.p[0])
@@ -359,12 +368,14 @@ class Window(Tk):
 				triProjected.p[0] = vec_divide(triProjected.p[0], triProjected.p[0].w)
 				triProjected.p[1] = vec_divide(triProjected.p[1], triProjected.p[1].w)
 				triProjected.p[2] = vec_divide(triProjected.p[2], triProjected.p[2].w)
+
 				# self.triSorted = self.depth_buffer_sort(triListTransformed)
 				self.draw(triProjected.p, obj, dp)
 
 
-def world_matrix():
-	matTrans = mat_make_trans(0,0,5)
+def world_matrix(trans):
+	matTrans = mat_make_trans(trans[0],trans[1],trans[2],)
+	# matTrans = mat_make_trans(0,10,5)
 	matWorld = np.matrix([
 		[1,0,0,0],
 		[0,1,0,0],
@@ -384,7 +395,6 @@ def projection_matrix(
 	znorm = zfar/(zfar-znear)
 	aspectRatio = screenwidth/screenheight
 	fovRad = 1/(math.tan((fov*0.5*math.pi)/(180.0)))
-	# angle = ticker/100
 
 	matProj = np.matrix([
 		[aspectRatio*fovRad,0,0,0],
@@ -414,9 +424,10 @@ def matRotY(angle):
 
 def matRotZ(angle):
 	matRotZ = np.matrix([
-		[math.cos(angle),-(math.sin(angle)),0],
-		[math.sin(angle),math.cos(angle),0],
-		[0,0,1],
+		[math.cos(angle),-(math.sin(angle)),0,0],
+		[math.sin(angle),math.cos(angle),0,0],
+		[0,0,1,0],
+		[0,0,0,1]
 		])
 	return matRotZ
 
@@ -427,17 +438,18 @@ def init_camera():
 	global vTarget
 	global fYaw
 	global fPitch
-	global camMove
-	
-	# vCamera = vec_add(vCamera, camMove)
+	global vUp
 
 	vTarget = vec3d(0,0,1)
 	vUp = vec3d(0,-1,0)
 	# print(f'vTarget: {vTarget.x},{vTarget.y},{vTarget.z}')
 	
-	matCameraRot = matRotY(fYaw)
-	# vLookDir = multiply_vecmat(vLookDir, matRotX(fPitch))
-	vLookDir = multiply_vecmat(vTarget, matCameraRot)
+	matCameraRotYaw = matRotY(fYaw) # Yaw pivots origin
+	vLookDir = multiply_vecmat(vTarget, matCameraRotYaw)
+
+	matCameraRotPitch = matRotX(fPitch)
+	vLookDir = multiply_vecmat(vLookDir, matCameraRotPitch)
+
 	vTarget = vec_add(vCamera, vLookDir)
 
 	# print(vLookDir.x, vLookDir.y, vLookDir.z, )
@@ -446,7 +458,7 @@ def init_camera():
 	# matView = np.linalg.inv(matCamera) ## Crash here if something.z == 0
 	matView = mat_inverse(matCamera)
 
-	print(f'vLookDir: {vLookDir.x},{vLookDir.y},{vLookDir.z}')
+	# print(f'vLookDir: {vLookDir.x},{vLookDir.y},{vLookDir.z}')
 	# print(f'vUp: {vUp.x},{vUp.y},{vUp.z}, vTarget: {vTarget.x},{vTarget.y},{vTarget.z}')
 
 	return matView
@@ -474,33 +486,13 @@ def mat_point_at(pos, target, up):
 def main():
 	global objectsGlobal
 	objectsGlobal = {
-		'ship': object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship'),
-		# 'axis': object('D:\\Users\\Koope\\Desktop\\axis.obj', 'axis'),
+		'ship': object('D:\\Users\\Koope\\Desktop\\ship.obj', 'ship', (0,0,0),),
+		'axis': object('D:\\Users\\Koope\\Desktop\\axis.obj', 'axis', (0,10,5),),
+		'cube': object('D:\\Users\\Koope\\Desktop\\cube.obj', 'cube', (3,5,0),1),
 		}
 
 	App = Window()
 	App.mainloop()
-
-
-meshCube = [
-	[[ 0.0, 0.0, 0.0,], [0.0, 1.0, 0.0,], [1.0, 1.0, 0.0 ]],
-	[[ 0.0, 0.0, 0.0,], [1.0, 1.0, 0.0,], [1.0, 0.0, 0.0 ]],
-
-	[[ 1.0, 0.0, 0.0,], [1.0, 1.0, 0.0,], [1.0, 1.0, 1.0 ]],
-	[[ 1.0, 0.0, 0.0,], [1.0, 1.0, 1.0,], [1.0, 0.0, 1.0 ]],
-
-	[[ 1.0, 0.0, 1.0,], [1.0, 1.0, 1.0,], [0.0, 1.0, 1.0 ]],
-	[[ 1.0, 0.0, 1.0,], [0.0, 1.0, 1.0,], [0.0, 0.0, 1.0 ]],
-
-	[[ 0.0, 0.0, 1.0,], [0.0, 1.0, 1.0,], [0.0, 1.0, 0.0 ]],
-	[[ 0.0, 0.0, 1.0,], [0.0, 1.0, 0.0,], [0.0, 0.0, 0.0 ]],
-
-	[[ 0.0, 1.0, 0.0,], [0.0, 1.0, 1.0,], [1.0, 1.0, 1.0 ]],
-	[[ 0.0, 1.0, 0.0,], [1.0, 1.0, 1.0,], [1.0, 1.0, 0.0 ]],
-
-	[[ 1.0, 0.0, 1.0,], [0.0, 0.0, 1.0,], [0.0, 0.0, 0.0 ]],
-	[[ 1.0, 0.0, 1.0,], [0.0, 0.0, 0.0,], [1.0, 0.0, 0.0 ]],
-]
 
 if __name__ == '__main__':
 	start = datetime.datetime.now()
