@@ -146,8 +146,6 @@ class Window(Tk):
 		self.screen_height = self.winfo_screenheight()
 		self.title("Tkinter window")
 		self.geometry("%dx%d" % (self.screen_width, self.screen_height))
-		self.attributes('-topmost', True)
-		# self.wm_attributes("-transparentcolor", "gray")
 		self.canvas = Canvas(self, width=self.screen_width, height=self.screen_height)
 		self.canvas.create_rectangle(0, 0, self.screen_width, self.screen_height, fill='gray', outline='gray')
 		# self.wait_visibility()
