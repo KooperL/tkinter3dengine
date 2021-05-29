@@ -23,12 +23,13 @@ class vec3d:
 
 class triangle:
 	def __init__(self,
-		v1: vec3d,
-		v2: vec3d,
-		v3: vec3d,
+		v1=vec3d(),
+		v2=vec3d(),
+		v3=vec3d(),
 		dp=None):
 		self.p=[v1, v2, v3]
 		self.dp=dp
+		self.col=None
 
 class object:
 	def __init__(self, objdir, name, vCoords=(0,0,0) , file=1):
@@ -58,7 +59,87 @@ class object:
 	def type2(self, rawPoints):
 		pass
 
+
+
+def vector_intersect_plane(plane_p: vec3d, plane_n: vec3d, lineStart: vec3d, lineEnd: vec3d) -> vec3d:
+		plane_n = vec_normalise(plane_n)
+		plane_d = -vec_dot_product(plane_n, plane_p)
+		ad = vec_dot_product(lineStart, plane_n)
+		bd = vec_dot_product(lineEnd, plane_n)
+		t = (-plane_d - ad) / (bd - ad)
+		lineStartToEnd = vec_subtract(lineEnd, lineStart)
+		lineToIntersect = vec_multiply(lineStartToEnd, t)
+		return vec_add(lineStart, lineToIntersect)
+
+def Triangle_ClipAgainstPlane(plane_p: vec3d, plane_n: vec3d, in_tri: triangle, out_tri1: triangle, out_tri2: triangle) -> int:
+		plane_n = vec_normalise(plane_n)
+
+		def dist(p: vec3d):
+			n = vec_normalise(p)
+			return (plane_n.x * p.x + plane_n.y * p.y + plane_n.z * p.z - vec_dot_product(plane_n, plane_p))
+
+		inside_points = [0,0,0]
+		nInsidePointCount = int(0)
+		outside_points = [0,0,0]
+		nOutsidePointCount = int(0)
+
+		d0 = float(dist(in_tri.p[0]))
+		d1 = float(dist(in_tri.p[1]))
+		d2 = float(dist(in_tri.p[2]))
+
+		if (d0 >= 0):
+			inside_points[nInsidePointCount] = in_tri.p[0]
+			nInsidePointCount+=1
+		else:
+			outside_points[nOutsidePointCount] = in_tri.p[0]
+			nOutsidePointCount+=1
+		if (d1 >= 0):
+			inside_points[nInsidePointCount] = in_tri.p[1]
+			nInsidePointCount+=1
+		else:
+			outside_points[nOutsidePointCount] = in_tri.p[1]
+			nOutsidePointCount+=1
+		if (d2 >= 0):
+			inside_points[nInsidePointCount] = in_tri.p[2]
+			nInsidePointCount+=1
+		else:
+			outside_points[nOutsidePointCount] = in_tri.p[2]
+			nOutsidePointCount+=1
+
+		if (nInsidePointCount == 0):
+			return [0]
+
+		if (nInsidePointCount == 3):
+			out_tri1 = in_tri
+			return 1, out_tri1
+
+		if (nInsidePointCount == 1 and nOutsidePointCount == 2):
+			out_tri1.col =  in_tri.col
+
+			# The inside point is valid, so keep that...
+			out_tri1.p[0] = inside_points[0]
+			out_tri1.p[1] = vector_intersect_plane(plane_p, plane_n, inside_points[0], outside_points[0])
+			out_tri1.p[2] = vector_intersect_plane(plane_p, plane_n, inside_points[0], outside_points[1])
+			return 1, out_tri1 # Return the newly formed single triangle
+
+		if (nInsidePointCount == 2 and nOutsidePointCount == 1):
+
+			out_tri1.col =  in_tri.col
+			out_tri2.col =  in_tri.col
+
+			out_tri1.p[0] = inside_points[0]
+			out_tri1.p[1] = inside_points[1]
+			out_tri1.p[2] = vector_intersect_plane(plane_p, plane_n, inside_points[0], outside_points[0])
+
+			out_tri2.p[0] = inside_points[1]
+			out_tri2.p[1] = out_tri1.p[2]
+			out_tri2.p[2] = vector_intersect_plane(plane_p, plane_n, inside_points[1], outside_points[0])
+			return 2, out_tri1, out_tri2
+
+
 def getZs(tri):
+	#lambda tri: (tri.p[0].z+tri.p[1].z+tri.p[2].z)/3
+	#np.mean(tri.p[0].z+tri.p[1].z+tri.p[2].z, dtype=float64)
 	return (tri.p[0].z+tri.p[1].z+tri.p[2].z)/3
 
 def _from_rgb(rgb):
@@ -112,13 +193,13 @@ def mat_inverse(input1):
 		 -(input1[3][0] * input1[2][0] + input1[3][1] * input1[2][1] + input1[3][2] * input1[2][2]), 1, ],
 		])
 
-def vec_dot_product(input1: vec3d, input2: vec3d):
+def vec_dot_product(input1: vec3d, input2: vec3d) -> float:
 	return input1.x * input2.x + input1.y * input2.y + input1.z * input2.z
 
-def vec_length(input1):
-	return sqrtf(vec_dot_product(v, v))
+def vec_length(input1: vec3d) -> float:
+	return math.sqrt(vec_dot_product(input1, input1)) ## why was this sqrtf
 
-def vec_normalise(input1):
+def vec_normalise(input1: vec3d) -> vec3d:
 	l = vec_length(input1)
 	return vec_divide(input1, l)
 
@@ -172,9 +253,9 @@ class Window(Tk):
 	def draw(self, points, tag, shade):
 		# print(f'Passed args: {points}, {tag}, {shade})')
 		col = _from_rgb((
-			int(100**shade),
-			int(100**shade),
-			int(100**shade)))
+			int(200**shade),
+			int(200**shade),
+			int(200**shade)))
 		xScale, yScale = 0.25, 0.5
 		xTransform, yTransform = self.screen_width/3, self.screen_height/3
 		self.canvas.create_polygon(
@@ -194,7 +275,8 @@ class Window(Tk):
 		ticker += 1
 		self.pipeline()
 		# print(f'fYaw: {fYaw}, fPitch: {fPitch}')
-		print(f'x: {vCamera.x}, y {vCamera.y}, z: {vCamera.z}')
+		# print(f'x: {vCamera.x}, y {vCamera.y}, z: {vCamera.z}')
+
 		self.after(1, self.timed_refresh)
 
 	def controls(self,
@@ -309,7 +391,7 @@ class Window(Tk):
 		self.bind('<KeyPress>', self.press)
 		# self.bind('<KeyRelease>', self.release)
 		for obj in objectsGlobal:
-			triToRaster = []
+			trisToRaster = []
 			for corner in objectsGlobal[obj].triList:
 
 				## World transformation
@@ -337,7 +419,6 @@ class Window(Tk):
 					dp = vec_dot_product(normal, l)
 				else:
 					continue
-				
 
 				## View transformation
 				triViewed = triangle(
@@ -345,25 +426,48 @@ class Window(Tk):
 					multiply_vecmat(triTransformed.p[1], init_camera()),
 					multiply_vecmat(triTransformed.p[2], init_camera()))
 
+				nClippedTriangles = Triangle_ClipAgainstPlane(vec3d(0,0,2.1), vec3d(0,0,1), triViewed, triangle(), triangle())
+				for i in range(nClippedTriangles[0]):
+					## Projection transformation
+					triProjected = triangle(
+						multiply_vecmat(nClippedTriangles[i+1].p[0], projection_matrix()),
+						multiply_vecmat(nClippedTriangles[i+1].p[1], projection_matrix()),
+						multiply_vecmat(nClippedTriangles[i+1].p[2], projection_matrix()),
+						dp)
 
-				## Clipping occurs here
+					triProjected.p[0] = vec_divide(triProjected.p[0], triProjected.p[0].w)
+					triProjected.p[1] = vec_divide(triProjected.p[1], triProjected.p[1].w)
+					triProjected.p[2] = vec_divide(triProjected.p[2], triProjected.p[2].w)
 
-				## Projection transformation
-				triProjected = triangle(
-					multiply_vecmat(triViewed.p[0], projection_matrix()),
-					multiply_vecmat(triViewed.p[1], projection_matrix()),
-					multiply_vecmat(triViewed.p[2], projection_matrix()),
-					dp)
+					trisToRaster.append(triProjected)
 
-				triProjected.p[0] = vec_divide(triProjected.p[0], triProjected.p[0].w)
-				triProjected.p[1] = vec_divide(triProjected.p[1], triProjected.p[1].w)
-				triProjected.p[2] = vec_divide(triProjected.p[2], triProjected.p[2].w)
+			trisToRaster.sort(reverse=True,key=getZs)
 
-				triToRaster.append(triProjected)
-			# triToRaster = self.depth_buffer_sort(triToRaster)
-			print(triToRaster[0])
-			triToRaster.sort(key=getZs)
-			for tri in triToRaster:
+			trisFinal = []
+			for triToRaster in trisToRaster:
+				trisFinal.append(triToRaster)
+				nNewTriangles = 1
+				for i in range(4):
+					while nNewTriangles > 0:
+						test = trisFinal[0]
+						trisFinal.pop(0)
+						nNewTriangles -= 1
+						if i == 0:
+							nTrisToAdd = Triangle_ClipAgainstPlane(vec3d(0,0,0), vec3d(0,0,0), test, triangle(), triangle())
+							# next
+						elif i == 1:
+							nTrisToAdd = Triangle_ClipAgainstPlane(vec3d(0,self.screen_height-1,0),vec3d(0,-1,0), test, triangle(), triangle())
+							# next
+						elif i == 2:
+							nTrisToAdd = Triangle_ClipAgainstPlane(vec3d(0,0,0), vec3d(1,0,0), test, triangle(), triangle())
+							# next
+						elif i == 3:
+							nTrisToAdd = Triangle_ClipAgainstPlane(vec3d(0,self.screen_width-1,0,0), vec3d(-1,0,0), test, triangle(), triangle())
+							# next
+						for w in range(nTrisToAdd[0]):
+							trisFinal.append(nTrisToAdd[w+1])
+
+			for tri in trisFinal:
 				self.draw(tri.p, obj, tri.dp)
 
 
