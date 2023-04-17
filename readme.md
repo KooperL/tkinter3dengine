@@ -1,3 +1,7 @@
+![Example 1](https://github.com/KooperL/tkinter3dengine/blob/main/gallery/example%201.png?raw=true, "Example 1")
+![Example 2](https://github.com/KooperL/tkinter3dengine/blob/main/gallery/example%202.png?raw=true, "Example 2")
+
+
 # Important
 
 This app uses `python 3.x`.
